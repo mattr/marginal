@@ -15,19 +15,24 @@ class Post
     "#{Site.url}/archive/#{slug}"
   end
 end
-class Posts; include Candy::Collection; collects :post; end
+class Posts
+  include Candy::Collection
+  collects :post
+end
 
 configure do
   require 'ostruct'
   Site = OpenStruct.new({
     :key    => 'admin',
-    :val    => 'changeme',
-    :pass   => 'password',
+    :val    => 'changeme', # replace with a random string to prevent attacks.
+    :pass   => 'password', # make this something more secure while you're at it.
     :url    => 'mydomain.com',
-    :disqus => 'mysite',
-    :title  => 'In Touch With The Obvious. Mostly.',
-    :author => 'Matt Redmond'
+    :disqus => 'mysite', # unset this if you don't want comments.
+    :title  => 'My Awesome Marginal Blog',
+    :author => 'My Name'
   })
+  # Assumes that the database is running on localhost:21027
+  # To see how to set additional parameters, see ''.
   Post.db = 'marginal'
 end
 
@@ -44,17 +49,17 @@ helpers do
     request.cookies[Site.key] == Site.val
   end
   
-  # Make sure the user's logged in.
+  # Make sure the user is logged in.
   def auth
     halt [ 401, "Not Authorized" ] unless admin?
   end
   
   # Make the separate tags into links to categories.
-  def tagify(array)
-    array.map { |a| "<a href=\"/tag/#{a}\">a</a>" }.join('&nbsp')
+  def tagify(tags)
+    tags.map { |a| "<a href=\"/tag/#{tag}\">#{tag}</a>" }.join('&nbsp')
   end
   
-  # Make a uniqe slug to reference the post using the title.
+  # Make a uniqe slug to reference the post using the title and incremental counter for repeated titles.
   def slugify(title)
     slug = title.downcase.gsub(/ /, '-').gsub(/[^a-z0-9\-]/, '').squeeze('-')
     if (count = Posts.slug(/#{slug}/).count) > 0
@@ -69,13 +74,13 @@ helpers do
   end
 end
 
-# Inline stylesheet
+# In-file stylesheet
 get "/site.css" do
   content_type 'text/css', :charset => "utf-8"
   sass :site
 end
 
-# Index/root
+# Index/root shows 5 most recent posts
 get "/" do
   haml :posts, :locals => { :posts => Posts.limit(5).sort(:created, :desc) }
 end
@@ -87,7 +92,12 @@ get "/feed" do
   builder :feed, :layout => false
 end
 
-# Older posts
+# Tagged posts
+get "/tag/:tag" do
+  haml :posts, :locals => { :posts => Posts.tag(params[:tag]).sort(:created, :desc) }
+end
+
+# Older posts, just dump everything in reverse chronological order.
 get "/archive" do
   haml :posts, :locals => { :posts => Posts.sort(:created, :desc) }
 end
@@ -95,11 +105,6 @@ end
 # Single post
 get "/archive/:slug" do
   haml :post, :locals => { :post => Post.slug(params[:slug]) }
-end
-
-# Tagged posts
-get "/tag/:tag" do
-  haml :posts, :locals => { :posts => Posts.tag(params[:tag]).sort(:created, :desc) }
 end
 
 ## Admin
@@ -118,13 +123,13 @@ end
 # New post
 get "/new" do
   auth
-  haml :edit, :locals => {:url => '/'}
+  haml :edit, :locals => {:url => "/create"}
 end
 
 # Create post
-post "/" do
+post "/create" do
   auth
-  post = Post.new(title: params[:title], slug: slugify(params[:title]), tags: params[:tags].split(' '), body: params[:body], created: Time.now, updated: Time.now)
+  post = Post.new(title: params[:title], slug: slugify(params[:title]), tags: params[:tags].split(' ').compact, body: params[:body], created: Time.now, updated: Time.now)
   redirect "/"
 end
 
@@ -139,46 +144,13 @@ post "/archive/:slug" do
   auth
   post = Post.slug(params[:slug])
   post.title    = params[:title]
-  post.tags     = params[:tags].split(' ')
+  post.tags     = params[:tags].split(' ').compact
   post.body     = params[:body]
   post.updated  = Time.now
   redirect "/archive/#{slug}"
 end
 
 __END__
-
-@@ layout
-!!! 5
-%html{:lang => "en"}
-  %head
-    %meta{:charset => "utf-8"}
-    %title= Site.title
-    %link{:href => "/feed", :rel => "alternate", :type => "application/xml"}
-    %link{:href => "/site.css", :rel => "stylesheet", :type => "text/css"}
-  %body
-    #page
-      #head
-        %h1
-          %a{:href => "http://#{Site.url}"}= Site.title
-        %h2= Site.author
-      #content
-        #sidebar
-          %a{:href => "/archive"} Archive
-        #main
-          = yield
-        .clear
-      #footer
-        ="&copy; #{Date.today.year} #{Site.author}"
-
-@@ posts
-- if admin?
-  %a{:href => "/new"} New Post
-- posts.each do |id|
-  .post
-    %h1
-      %a{:href => "/archive/#{post.slug}"}= post.title
-    .tags= tagify(post.tags)
-    .body= html(post.summary)
 
 @@ feed
 xml.instruct!
@@ -201,6 +173,40 @@ xml.feed "xmlns" => "http://www.w3.org/2005/Atom" do
     end
   end
 end
+
+@@ layout
+!!! 5
+%html{:lang => "en"}
+  %head
+    %meta{:charset => "utf-8"}
+    %title= Site.title
+    %link{:href => "/feed", :rel => "alternate", :type => "application/xml"}
+    %link{:href => "/site.css", :rel => "stylesheet", :type => "text/css"}
+  %body
+    #page
+      #head
+        %h1
+          %a{:href => "http://#{Site.url}"}= Site.title
+        %h2= Site.author
+      #content
+        = yield
+        .archive
+          [&nbsp;
+          %a{:href => "/archive"} Older Posts
+          &nbsp;]
+      .clear
+      #footer
+        ="&copy; #{Date.today.year} #{Site.author}"
+
+@@ posts
+- if admin?
+  %a{:href => "/new"} New Post
+- posts.each do |post|
+  .post
+    %h1
+      %a{:href => "/archive/#{post.slug}"}= post.title
+    .tags= tagify(post.tags)
+    .body= html(post.summary)
 
 @@ post
 .post
@@ -263,29 +269,28 @@ a:hover
   :background #fff
   :color #222
   :border 1px solid #666
-  :min-height 300px
-  #sidebar
+  :padding 10px
+  h1
+    :font-size 21px
+    :margin-left 30px
+  .date
     :float left
-    :width 172px
-    :padding 10px
-    :height 100%
-  #main
-    :width 728px
-    :padding 10px
-    :float left
-    form > *
-      :display block
-      :color #404040
-      :padding 2px
-      :font-size 14px
-      :width 100%
-      :margin-bottom 10px
-    input[type="text"]
-      :font-size 16px
-    textarea
-      :height 300px
-    .new_post, .edit_post
-      :float right
+  .archive
+    :text-align center
+  form > *
+    :display block
+    :color #404040
+    :padding 2px
+    :font-size 14px
+    :width 100%
+    :margin-bottom 10px
+  input[type="text"], input[type="password"]
+    :padding 2px
+    :font-size 16px
+  textarea
+    :height 300px
+  .new_post, .edit_post
+    :float right
 #footer
   :font-size 10px
   :text-align center
