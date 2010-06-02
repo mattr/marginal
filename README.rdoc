@@ -1,0 +1,19 @@
+Marginal
+========
+
+Introduction
+------------
+
+Marginal aims to provide the most minimal blog possible without loss of basic features. Marginal is built on Adam Wiggins' ['Scanty':http://github.com/awiggins/scanty] but relies entirely on in-file templates and models.
+
+Models
+------
+
+Marginal uses the Candy implementation of MongoDB. This eliminates find and save methods in favour of atomic methods on each call. The attributes for the model are defined by the methods called on them (unless defined explicitly in the model class).
+
+This project is in REALLY REALLY early stages...
+
+License
+-------
+
+MIT
