@@ -1,165 +1,139 @@
-require 'rubygems'
-require 'sinatra'
-require 'haml'
-require 'builder'
-require 'candy'
-require 'redcloth'
-require 'coderay'
-
-class Post
+# Chances are you've got at least 5 of these installed already...
+%w{ rubygems sinatra candy haml builder redcloth coderay }.each { |gemname| require gemname }
+class Post # Document class, used to return a single result.
   include Candy::Piece
-  def summary
+  
+  def summary # Shorter body text
     body.match(/(.{200}.*?\n)/m).to_s
   end
-  def url
-    "#{Site.url}/archive/#{slug}"
+  
+  def url # Full url for use in rss feed link
+    "#{Site.url}/post/#{slug}"
   end
 end
-class Posts
-  include Candy::Collection
-  collects :post
-end
+class Posts; include Candy::Collection; collects :post; end # Collection class, used to return multiple results.
 
 configure do
   require 'ostruct'
   Site = OpenStruct.new({
-    :key    => 'admin',
-    :val    => 'changeme', # replace with a random string to prevent attacks.
-    :pass   => 'password', # make this something more secure while you're at it.
-    :url    => 'mydomain.com',
-    :disqus => 'mysite', # unset this if you don't want comments.
-    :title  => 'My Awesome Marginal Blog',
-    :author => 'My Name'
+    :key  => 'admin',             # Cookie key
+    :val  => 'randomstring',      # Change this to something random; this is stored as the cookie value.
+    :pass => 'password',          # While your at it, make this a little more secure.
+    :url  => 'mysite.com',        # The base URL to which this blog is deployed.
+    :disq => 'mysite',            # The disqus reference to your site. Just remove to disable comments.
+    :name => 'My Marginal Blog',  # The title of your blog.
+    :me   => 'My Name'            # Your name.
   })
-  # Assumes that the database is running on localhost:21027
-  # To see how to set additional parameters, see ''.
-  Post.db = 'marginal'
+  # Assumes localhost:27017; see http://rdoc.info/projects/SFEley/candy for more config options
+  Post.db = "marginal"
 end
 
-error do
+error do # Error handling
   e = request.env['sinatra.error']
   puts e.to_s
-  puts e.backtrace.join("\n")
+  puts e.backtrace.join "\n"
   "Application error"
 end
 
-helpers do
-  # Is the user logged in?
-  def admin?
+helpers do # Helper methods for views, parameter handling and authentication.
+  def admin? # Checks if the user is logged in.
     request.cookies[Site.key] == Site.val
   end
   
-  # Make sure the user is logged in.
-  def auth
-    halt [ 401, "Not Authorized" ] unless admin?
+  def auth # Restricts access to admin pages.
+    halt [401, "Not authorized"] unless admin?
   end
   
-  # Make the separate tags into links to categories.
-  def tagify(tags)
-    tags.map { |a| "<a href=\"/tag/#{tag}\">#{tag}</a>" }.join('&nbsp')
+  def link(tags) # Turns each of the elements in the array to an anchor tag.
+    tags.each { |tag| "<a href=\"/tag/#{tag}\">#{tag}</a>" }
   end
   
-  # Make a uniqe slug to reference the post using the title and incremental counter for repeated titles.
-  def slugify(title)
-    slug = title.downcase.gsub(/ /, '-').gsub(/[^a-z0-9\-]/, '').squeeze('-')
-    if (count = Posts.slug(/#{slug}/).count) > 0
-      slug << "-#{count}"
-    end
+  def slugify(title) # Turn the title into a slug with auto-increment for repeats.
+    slug = title.downcase.gsub(/ /, '-').gsub(/[^a-z0\-]/, '').squeeze('-')
+    slug << "-#{count}" if (count = Posts.slug(/#{slug}/).count) > 0
     slug
   end
   
-  # Format the body into HTML.
-  def html(text)
-    RedCloth.new(text.gsub(/\<code( lang="(.+?)")?\>(.+?)\<\/code\>/m) { "<notextile>#{CodeRay.scan($3, $2).div(:css => :class)}</notextile>" }).to_html
+  def html(text) # Parse the body text using RedCloth, with CodeRay for code syntax highlighting.
+    RedCloth.new( text.gsub(/\<code( lang="(.+?)")?\>(.+?)\<\/code\>/m) { "<notextile>#{CodeRay.scan($3, $2).div(:css => :class)}</notextile>"} ).to_html
   end
 end
 
-# In-file stylesheet
+## STYLESHEET
 get "/site.css" do
-  content_type 'text/css', :charset => "utf-8"
+  content_type "text/css", :charset => "utf-8"
   sass :site
 end
 
-# Index/root shows 5 most recent posts
-get "/" do
+## PUBLIC PAGES
+get "/" do # Root, shows 5 most recent blog posts in reverse chronologial order.
   haml :posts, :locals => { :posts => Posts.limit(5).sort(:created, :desc) }
 end
 
-# Atom feed
-get "/feed" do
-  content_type 'application/xml', :charset => 'utf-8'
+get "/feed" do # Shows the 20 most recent blog posts in reverse chronological order (atom format).
+  content_type "application/xml", :charset => "utf-8"
   @posts = Posts.limit(20).sort(:created, :desc)
   builder :feed, :layout => false
 end
 
-# Tagged posts
-get "/tag/:tag" do
+get "/tag/:tag" do # Lists all posts with a particular tag in reverse chronological order.
   haml :posts, :locals => { :posts => Posts.tag(params[:tag]).sort(:created, :desc) }
 end
 
-# Older posts, just dump everything in reverse chronological order.
-get "/archive" do
-  haml :posts, :locals => { :posts => Posts.sort(:created, :desc) }
+get "/posts" do # Lists all posts in reverse chronological order. This is the closest we get to an archive.
+  haml :posts, :locals => {:posts => Posts.sort(:created, :desc) }
 end
 
-# Single post
-get "/archive/:slug" do
+get "/posts/:slug" do # Displays a particular post.
   haml :post, :locals => { :post => Post.slug(params[:slug]) }
 end
 
-## Admin
-
-# Login prompt
-get "/auth" do
+## ADMIN PAGES
+get "/auth" do # Login prompt.
   haml :auth
 end
 
-# Login action
-post "/auth" do
+post "/auth" do # Login validation.
   response.set_cookie(Site.key, Site.val) if params[:pass] == Site.pass
   redirect "/"
 end
 
-# New post
-get "/new" do
+get "/new" do # Form to create new post.
   auth
-  haml :edit, :locals => {:url => "/create"}
+  haml :edit, :locals => { :url => "/create" }
 end
 
-# Create post
-post "/create" do
+post "/create" do # Creates a new post.
   auth
-  post = Post.new(title: params[:title], slug: slugify(params[:title]), tags: params[:tags].split(' ').compact, body: params[:body], created: Time.now, updated: Time.now)
-  redirect "/"
+  Post.new(title: params[:title], slug: slugify(params[:title]), tags: params[:tags].split(' ').compact, body: params[:body], created: Time.now, updated: Time.now)
 end
 
-# Edit post
-get "/archive/:slug/edit" do
+get "/posts/:slug/edit" do # Form to edit an existing post.
   auth
-  haml :edit, :locals => { :url => "/archive/#{params[:slug]}", :post => Post.slug(params[:slug]) }
+  haml :edit => { :url => "/posts/#{params[:slug]}", :post => Post.slug(params[:slug]) }
 end
 
-# Update post
-post "/archive/:slug" do
+post "/posts/:slug" do # Updates an existing post.
   auth
   post = Post.slug(params[:slug])
-  post.title    = params[:title]
-  post.tags     = params[:tags].split(' ').compact
-  post.body     = params[:body]
-  post.updated  = Time.now
-  redirect "/archive/#{slug}"
+  post.title = params[:title]
+  post.tags = params[:tags].split(' ')
+  post.body = params[:body]
+  post.updated = Time.now
+  redirect "/posts/#{params[:slug]}"
 end
+
+# To delete posts, you have to go in to the console.
 
 __END__
 
 @@ feed
 xml.instruct!
 xml.feed "xmlns" => "http://www.w3.org/2005/Atom" do
-  xml.title Site.title
+  xml.title Site.name
   xml.id Site.url
-  xml.updated posts.first.created.iso8601 if @posts.any?
-  xml.author { xml.name Site.author }
-  
+  xml.updated @posts.first.created.iso8601 if @posts.any?
+  xml.author { xml.name Site.me }
   @posts.each do |post|
     xml.entry do
       xml.title post.title
@@ -167,7 +141,7 @@ xml.feed "xmlns" => "http://www.w3.org/2005/Atom" do
       xml.id post.url
       xml.published post.created.iso8601
       xml.updated post.updated.iso8601
-      xml.author { xml.name Site.author }
+      xml.author { xml.name Site.me }
       xml.summary html(post.summary), "type" => "html"
       xml.content html(post.body), "type" => "html"
     end
@@ -179,118 +153,114 @@ end
 %html{:lang => "en"}
   %head
     %meta{:charset => "utf-8"}
-    %title= Site.title
-    %link{:href => "/feed", :rel => "alternate", :type => "application/xml"}
-    %link{:href => "/site.css", :rel => "stylesheet", :type => "text/css"}
+    %title= Site.name
+    %link{:rel => "stylesheet", :type => "text/css", :href => "site.css", :media => "screen,projection"}
   %body
     #page
-      #head
-        %h1
-          %a{:href => "http://#{Site.url}"}= Site.title
-        %h2= Site.author
+      #header
+        %h1= Site.name
+        %h2= Site.me
       #content
         = yield
-        .archive
-          [&nbsp;
-          %a{:href => "/archive"} Older Posts
-          &nbsp;]
-      .clear
+        #archive= "[&nbsp;<a href=\"/posts\">Older Posts</a>&nbsp;]"
       #footer
-        ="&copy; #{Date.today.year} #{Site.author}"
+        = "&copy; #{Date.today.year} #{Site.me}"
 
 @@ posts
 - if admin?
-  %a{:href => "/new"} New Post
+  %a.new{:href => "/new"} New Post
 - posts.each do |post|
   .post
-    %h1
-      %a{:href => "/archive/#{post.slug}"}= post.title
-    .tags= tagify(post.tags)
+    %h2
+      %a{:href => "/posts/#{post.slug}"} Post.title
+    .date= "#{post.created.strftime('%d')}<br />#{post.created.strftime('%m')}"
+    .tags= link(post.tags)
     .body= html(post.summary)
+    %a.more{:href => "/posts/#{post.slug}"} More...
 
 @@ post
 .post
   - if admin?
-    %a.edit_post{:href => "/#{post.slug}/edit"} Edit
-  %h1= post.title
-  .tags= tagify(post.tags)
-  .date= post.created.strftime('%d %B %Y')
+    %a.edit{:href => "/posts/#{post.slug}/edit"} Edit
+  %h2= post.title
+  .date= "#{post.created.strftime('%d')}<br />#{post.created.strftime('%m')}"
+  .tags= link(post.tags)
   .body= html(post.body)
   #comments
-    - if Site.disqus
+    - if Site.disq
       #disqus_thread
-      %script{:type => "text/javascript", :src => "http://disqus.com/forums/#{Site.disqus}/embed.js"}
-      %noscript
-        %a{:href => "http://#{Site.disqus}.disqus.com/?url=ref"}View the discussion thread.
-      %a{:href => "http://disqus.com", :class => "dsq-brlink"}
-        blog comments powered by
-        %span.logo-disqus Disqus
+        %script{:type => "text/javascript", :src => "http://disqus.com/forums/#{Site.disq}/embed.js"}
+        %noscript
+          %a{:href => "http://#{Site.disq}.disqus.com/?url=ref"} View the discussion thread.
+        %a{:href => "http://disqus.com", :class => "dsq-brlink"}
+          blog comments powered by
+          %span.logo-disqus Disqus
 
 @@ edit
 %form{:action => url, :method => "POST"}
-  %input{:type => "text", :id => "title", :name => "title", :value => (post.title rescue '')}
-  %input{:type => "text", :id => "tags", :name => "tags", :value => (post.tags.join(' ') rescue '')}
-  %textarea{:id => "body", :name => "body", :value => (post.body rescue '')}
-  %input{:type => "submit", :value => "Save"}
+  %input#title{:type => "text", :name => "title", :value => (post.title rescue ''), :overlay => "Title"}
+  %input#tags{:type => "text", :name => "tags", :value => (post.tags.join(' ') rescue ''), :overlay => "Tags"}
+  %textarea#body{:name => "body", :value => (post.body rescue '')}
+  %input#commit{:type => "submit", :name => "commit", :value => "Save"}
 
 @@ auth
 %form{:action => "/auth", :method => "POST"}
-  %label{:for => "pass"} Password
-  %br
-  %input{:type => "password", :id => "pass", :name => "pass"}
+  %input#password{:type => "password", :name => "pass", :prefill => "Password"}
+  %input#commit{:type => "submit", :name => "commit", :value => "Login"}
 
 @@ site
 body
   :background #292929
   :color #fefefe
-  :font-family "helvetica neue", arial, sans-serif
-  :font-size 13px
+  :font 13px/1.3 "helvetica neue", helvetica, arial, sans-serif
 #page
-  :width 960px
+  :width 940px
   :padding 10px
   :margin auto
-h1, h1 > a
-  :font-size 27px
-  :color #fefefe
-  :text-decoration none
-  :text-transform lowercase
-h2
-  :font-size 19px
-  :font-variant italic
-a, a:visited
-  :color #404040
-  :text-decoration underline
-a:hover
-  :text-decoration none
-.clear
-  :clear both
-  :float none
+#header
+  h1
+    :font-size 25px
+    :text-transform lowercase
+    a
+      :color #fefefe
+      :text-decoration none
+  h2
+    :font-size 21px
+    :font-variant italic
 #content
   :background #fff
   :color #222
-  :border 1px solid #666
+  :text-align justify
   :padding 10px
-  h1
-    :font-size 21px
+  :border 1px solid #666
+  a, a:visited
+    :color #404040
+    :text-decoration underline
+  a:hover
+    :color #202020
+    :text-decoration none
+  h2
+    :font-size 17px
+    :padding 5px
     :margin-left 30px
+    a
+      :text-decoration none
+    a:hover
+      :text-decoration underline
   .date
     :float left
-  .archive
-    :text-align center
-  form > *
-    :display block
-    :color #404040
-    :padding 2px
-    :font-size 14px
-    :width 100%
-    :margin-bottom 10px
-  input[type="text"], input[type="password"]
-    :padding 2px
-    :font-size 16px
-  textarea
-    :height 300px
-  .new_post, .edit_post
+  .new, .edit
     :float right
+  #archive
+    :text-align center
+  input
+    :padding 2px
+    :width 80%
+    #title
+      :font-size 15px
+  textarea
+    :width 80%
+    :height 40
 #footer
-  :font-size 10px
   :text-align center
+  :font-size 11px

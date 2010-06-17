@@ -1,20 +1,22 @@
-= Marginal =
+= Marginal
 
-== Introduction ==
+== Introduction
 
-Marginal provides a minimalist blogging set up without loss of basic features. It is based on 
-Adam Wiggins' "Scanty" engine; however, Marginal provides the entire application in a single file,
-and likewise provides testing within a single file.
+Marginal provides a minimalist blogging set up without loss of basic features. It is based on Adam
+Wiggins' Scanty engine (http://github.com/adamwiggins/scanty); however, Marginal provides the 
+entire application (including all layout) in a single file.
 
-Marginal utilises the Candy wrapper for MongoDB, which eschews 'find' and 'save' methods for atomic
-updates to the document as attributes are set.
+Marginal utilises the Candy wrapper (so many puns!) for MongoDB, which eschews 'find' and 'save' methods
+for atomic updates to the document as attributes are set.
+
+For details on the various capabilities and configuration options of marginal, see the inline 
+documentation in <tt>main.rb</tt>.
 
 This software is in VERY early stages, so use at your own risk.
 
-== License ==
+== Meta
 
-Licensed under the MIT license. This software is provided 'as is' with no warranty.
-
-== Author ==
-
-Matt Redmond, with elements derived from original work by Adam Wiggins.
+Author:: Matt Redmond,  matthew.redmond@mail.com
+License:: MIT License http://www.opensource.org/licenses/mit-license.php
+Repository:: http://github.com/mattr/marginal
+Site:: http://mattredmond.com
