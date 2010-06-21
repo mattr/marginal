@@ -1,5 +1,5 @@
-# Chances are you've got at least 5 of these installed already...
-%w{ rubygems sinatra candy haml builder redcloth coderay }.each { |gemname| require gemname }
+# Chances are you've got at least 6 of these installed already...
+%w{ rubygems sinatra candy haml sass builder redcloth coderay }.each { |gemname| require gemname }
 class Post # Document class, used to return a single result.
   include Candy::Piece
   
@@ -11,7 +11,7 @@ class Post # Document class, used to return a single result.
     "#{Site.url}/post/#{slug}"
   end
 end
-class Posts; include Candy::Collection; collects :post; end # Collection class, used to return multiple results.
+class Posts; include Candy::Collection; collects Post; end # Collection class, used to return multiple results.
 
 configure do
   require 'ostruct'
@@ -45,12 +45,12 @@ helpers do # Helper methods for views, parameter handling and authentication.
   end
   
   def link(tags) # Turns each of the elements in the array to an anchor tag.
-    tags.each { |tag| "<a href=\"/tag/#{tag}\">#{tag}</a>" }
+    tags.map { |tag| "<a href=\"/tag/#{tag}\">#{tag}</a>" }.join('&nbsp;')
   end
   
   def slugify(title) # Turn the title into a slug with auto-increment for repeats.
     slug = title.downcase.gsub(/ /, '-').gsub(/[^a-z0\-]/, '').squeeze('-')
-    slug << "-#{count}" if (count = Posts.slug(/#{slug}/).count) > 0
+    if ((count = Posts.slug(/#{slug}/).count) > 0); slug << "-#{count}"; end
     slug
   end
   
@@ -198,14 +198,14 @@ end
 
 @@ edit
 %form{:action => url, :method => "POST"}
-  %input#title{:type => "text", :name => "title", :value => (post.title rescue ''), :overlay => "Title"}
-  %input#tags{:type => "text", :name => "tags", :value => (post.tags.join(' ') rescue ''), :overlay => "Tags"}
+  %input#title{:type => "text", :name => "title", :value => (post.title rescue ''), :placeholder => "Title"}
+  %input#tags{:type => "text", :name => "tags", :value => (post.tags.join(' ') rescue ''), :placeholder => "Tags"}
   %textarea#body{:name => "body", :value => (post.body rescue '')}
   %input#commit{:type => "submit", :name => "commit", :value => "Save"}
 
 @@ auth
 %form{:action => "/auth", :method => "POST"}
-  %input#password{:type => "password", :name => "pass", :prefill => "Password"}
+  %input#password{:type => "password", :name => "pass", :placeholder => "Password"}
   %input#commit{:type => "submit", :name => "commit", :value => "Login"}
 
 @@ site
