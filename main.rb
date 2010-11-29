@@ -1,5 +1,8 @@
 # Chances are you've got at least 6 of these installed already...
-%w{ rubygems sinatra candy haml sass builder redcloth coderay }.each { |gemname| require gemname }
+%w{
+  rubygems sinatra candy haml sass builder redcloth coderay securerandom
+}.each { |gemname| require gemname }
+
 class Post # Document class, used to return a single result.
   include Candy::Piece
   
@@ -10,19 +13,21 @@ class Post # Document class, used to return a single result.
   def url # Full url for use in rss feed link
     "#{Site.url}/post/#{slug}"
   end
+  
 end
-class Posts; include Candy::Collection; collects Post; end # Collection class, used to return multiple results.
+
+class Posts; include Candy::Collection; collects :post; end # Collection class, used to return multiple results.
 
 configure do
   require 'ostruct'
   Site = OpenStruct.new({
-    :key  => 'admin',             # Cookie key
-    :val  => 'randomstring',      # Change this to something random; this is stored as the cookie value.
-    :pass => 'password',          # While your at it, make this a little more secure.
-    :url  => 'mysite.com',        # The base URL to which this blog is deployed.
-    :disq => 'mysite',            # The disqus reference to your site. Just remove to disable comments.
-    :name => 'My Marginal Blog',  # The title of your blog.
-    :me   => 'My Name'            # Your name.
+    :key  => 'admin',                 # Cookie key
+    :val  => SecureRandom.base64(64), # Randomize the cookie each time the app is started.
+    :pass => 'password',              # While your at it, make this a little more secure.
+    :url  => 'mysite.com',            # The base URL to which this blog is deployed.
+    :disq => 'mysite',                # The disqus reference to your site. Just remove to disable comments.
+    :name => 'My Marginal Blog',      # The title of your blog.
+    :me   => 'My Name'                # Your name.
   })
   # Assumes localhost:27017; see http://rdoc.info/projects/SFEley/candy for more config options
   Post.db = "marginal"
@@ -49,7 +54,7 @@ helpers do # Helper methods for views, parameter handling and authentication.
   end
   
   def slugify(title) # Turn the title into a slug with auto-increment for repeats.
-    slug = title.downcase.gsub(/ /, '-').gsub(/[^a-z0\-]/, '').squeeze('-')
+    slug = title.strip.downcase.gsub(/ /, '-').gsub(/[^a-z0-9\-]/, '').squeeze('-')
     if ((count = Posts.slug(/#{slug}/).count) > 0); slug << "-#{count}"; end
     slug
   end
@@ -156,30 +161,32 @@ end
     %title= Site.name
     %link{:rel => "stylesheet", :type => "text/css", :href => "site.css", :media => "screen,projection"}
   %body
-    #page
-      #header
+    %section#page
+      %header
         %h1= Site.name
         %h2= Site.me
-      #content
+      %section#content
         = yield
-        #archive= "[&nbsp;<a href=\"/posts\">Older Posts</a>&nbsp;]"
-      #footer
+        %footer#archive= "[&nbsp;<a href=\"/posts\">Older Posts</a>&nbsp;]"
+      %footer
         = "&copy; #{Date.today.year} #{Site.me}"
 
 @@ posts
 - if admin?
   %a.new{:href => "/new"} New Post
 - posts.each do |post|
-  .post
-    %h2
-      %a{:href => "/posts/#{post.slug}"} Post.title
-    .date= "#{post.created.strftime('%d')}<br />#{post.created.strftime('%m')}"
-    .tags= link(post.tags)
+  %article.post
+    %header
+      %h2
+        %a{:href => "/posts/#{post.slug}"} Post.title
+      .date= "#{post.created.strftime('%d')}<br />#{post.created.strftime('%m')}"
+      .tags= link(post.tags)
     .body= html(post.summary)
-    %a.more{:href => "/posts/#{post.slug}"} More...
+    %footer
+      %a.more{:href => "/posts/#{post.slug}"} More...
 
 @@ post
-.post
+%article.post
   - if admin?
     %a.edit{:href => "/posts/#{post.slug}/edit"} Edit
   %h2= post.title
@@ -199,16 +206,20 @@ end
 @@ edit
 %form{:action => url, :method => "POST"}
   %input#title{:type => "text", :name => "title", :value => (post.title rescue ''), :placeholder => "Title"}
-  %input#tags{:type => "text", :name => "tags", :value => (post.tags.join(' ') rescue ''), :placeholder => "Tags"}
+  %input#tags{:type => "text", :name => "tags", :value => (post.tags.join(' ') rescue ''), :placeholder => "Separate tags with spaces"}
   %textarea#body{:name => "body", :value => (post.body rescue '')}
+  %br
   %input#commit{:type => "submit", :name => "commit", :value => "Save"}
 
 @@ auth
 %form{:action => "/auth", :method => "POST"}
   %input#password{:type => "password", :name => "pass", :placeholder => "Password"}
+  %br
   %input#commit{:type => "submit", :name => "commit", :value => "Login"}
 
 @@ site
+article,footer,header,section
+  :display block
 body
   :background #292929
   :color #fefefe
@@ -253,14 +264,15 @@ body
     :float right
   #archive
     :text-align center
-  input
+  input[type=text], input[type=password]
+    :font-size 16px
     :padding 2px
     :width 80%
     #title
       :font-size 15px
   textarea
     :width 80%
-    :height 40
+    :height 200px
 #footer
   :text-align center
   :font-size 11px
