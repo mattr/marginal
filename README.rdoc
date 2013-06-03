@@ -2,15 +2,11 @@
 
 == Introduction
 
-Marginal provides a minimalist blogging set up without loss of basic features. It is based on Adam
-Wiggins' Scanty engine (http://github.com/adamwiggins/scanty); however, Marginal provides the 
-entire application (including all layout) in a single file.
+Marginal provides a minimalist blogging set up without loss of basic features. It is based on Adam Wiggins' Scanty engine (http://github.com/adamwiggins/scanty); however, Marginal provides the entire application (including all layout) in a single file.
 
-Marginal utilises the Candy wrapper (so many puns!) for MongoDB, which eschews 'find' and 'save' methods
-for atomic updates to the document as attributes are set.
+Marginal utilises the Candy wrapper (so many puns!) for MongoDB, which eschews 'find' and 'save' methods for atomic updates to the document as attributes are set.
 
-For details on the various capabilities and configuration options of marginal, see the inline 
-documentation in <tt>main.rb</tt>.
+For details on the various capabilities and configuration options of marginal, see the inline documentation in <tt>main.rb</tt>.
 
 This software is in VERY early stages, so use at your own risk.
 

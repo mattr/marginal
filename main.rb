@@ -1,19 +1,19 @@
-# Chances are you've got at least 6 of these installed already...
+s# Chances are you've got at least 6 of these installed already...
 %w{
   rubygems sinatra candy haml sass builder redcloth coderay securerandom
 }.each { |gemname| require gemname }
 
 class Post # Document class, used to return a single result.
   include Candy::Piece
-  
+
   def summary # Shorter body text
     body.match(/(.{200}.*?\n)/m).to_s
   end
-  
+
   def url # Full url for use in rss feed link
     "#{Site.url}/post/#{slug}"
   end
-  
+
 end
 
 class Posts; include Candy::Collection; collects :post; end # Collection class, used to return multiple results.
@@ -44,21 +44,21 @@ helpers do # Helper methods for views, parameter handling and authentication.
   def admin? # Checks if the user is logged in.
     request.cookies[Site.key] == Site.val
   end
-  
+
   def auth # Restricts access to admin pages.
     halt [401, "Not authorized"] unless admin?
   end
-  
+
   def link(tags) # Turns each of the elements in the array to an anchor tag.
     tags.map { |tag| "<a href=\"/tag/#{tag}\">#{tag}</a>" }.join('&nbsp;')
   end
-  
+
   def slugify(title) # Turn the title into a slug with auto-increment for repeats.
     slug = title.strip.downcase.gsub(/ /, '-').gsub(/[^a-z0-9\-]/, '').squeeze('-')
     if ((count = Posts.slug(/#{slug}/).count) > 0); slug << "-#{count}"; end
     slug
   end
-  
+
   def html(text) # Parse the body text using RedCloth, with CodeRay for code syntax highlighting.
     RedCloth.new( text.gsub(/\<code( lang="(.+?)")?\>(.+?)\<\/code\>/m) { "<notextile>#{CodeRay.scan($3, $2).div(:css => :class)}</notextile>"} ).to_html
   end
